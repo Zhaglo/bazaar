@@ -15,6 +15,15 @@ from users.models import User
 
 
 def _parse_json(request):
+    """
+    Извлекает и декодирует JSON из тела HTTP-запроса.
+
+    Args:
+        request (HttpRequest): Объект HTTP-запроса Django.
+
+    Returns:
+        dict | None: Словарь, полученный из JSON, или None, если JSON некорректен.
+    """
     try:
         return json.loads(request.body.decode("utf-8"))
     except json.JSONDecodeError:
@@ -22,6 +31,19 @@ def _parse_json(request):
 
 
 def shop_list(request):
+    """
+    Возвращает список всех магазинов, зарегистрированных на платформе.
+
+    Доступ: публичный (без авторизации).
+
+    HTTP метод: GET
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        JsonResponse: Список магазинов с полями id, name, address, description.
+    """
     if request.method != 'GET':
         return JsonResponse({'detail': 'Method not allowed'}, status=405)
 
@@ -30,6 +52,23 @@ def shop_list(request):
 
 
 def shop_catalog(request, shop_id):
+    """
+    Возвращает каталог товаров указанного магазина.
+
+    Доступ: публичный (без авторизации).
+
+    HTTP метод: GET
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        shop_id (int): Идентификатор магазина.
+
+    Returns:
+        JsonResponse: Объект с полями shop (id, name, address) и catalog (список товаров).
+
+    Raises:
+        404: Магазин не найден.
+    """
     if request.method != 'GET':
         return JsonResponse({'detail': 'Method not allowed'}, status=405)
 
@@ -59,8 +98,27 @@ def shop_catalog(request, shop_id):
 @csrf_exempt
 def shop_application_create(request):
     """
-    Оставить заявку на подключение магазина
-    Можно отправлять как гостем, так и будучи залогиненным.
+    Создаёт заявку на регистрацию нового магазина.
+
+    Может вызываться как авторизованным пользователем, так и гостем.
+
+    Обязательные поля в JSON:
+        - shop_name (str): Название магазина.
+        - address (str): Адрес магазина.
+        - contact_name (str): Контактное лицо.
+        - contact_phone (str): Телефон для связи.
+
+    Опциональные поля:
+        - description (str): Описание магазина.
+        - comment (str): Дополнительный комментарий.
+
+    HTTP метод: POST
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        JsonResponse: Данные созданной заявки (id, status, shop_name, contact_name, contact_phone) с HTTP 201.
     """
     if request.method != "POST":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
@@ -109,6 +167,24 @@ def shop_application_create(request):
 
 @login_required
 def my_shops(request):
+    """
+    Возвращает список магазинов, принадлежащих текущему пользователю.
+
+    Доступ:
+        - Пользователь с ролью SHOP (владелец магазина).
+        - Администратор (видит все свои магазины, если создавал).
+
+    HTTP метод: GET
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        JsonResponse: Список магазинов с полями id, name, address, description.
+
+    Raises:
+        403: Пользователь не имеет роли SHOP или ADMIN.
+    """
     user: User = request.user  # type: ignore
 
     if user.role not in (User.Roles.SHOP, User.Roles.ADMIN):
@@ -125,7 +201,32 @@ def my_shops(request):
 @csrf_exempt
 def shop_catalog_manage(request, shop_id: int):
     """
-    POST: создать позицию каталога для магазина владельца.
+    Управление каталогом магазина: создание нового товара.
+
+    Доступ:
+        - Владелец магазина (роль SHOP).
+        - Администратор.
+
+    HTTP метод: POST
+
+    Тело запроса (JSON):
+        - name (str, обязательное): Название товара.
+        - price (decimal, обязательное): Цена.
+        - description (str, опционально): Описание.
+        - is_available (bool, опционально, по умолчанию True): Доступность.
+        - section_id (int, опционально): ID раздела каталога.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        shop_id (int): ID магазина.
+
+    Returns:
+        JsonResponse: Данные созданного товара (id, section_id, name, description, price, is_available) с HTTP 201.
+
+    Raises:
+        403: Недостаточно прав или магазин не принадлежит пользователю.
+        404: Магазин или раздел не найден.
+        400: Некорректные данные (отсутствуют обязательные поля, неверная цена).
     """
     user: User = request.user  # type: ignore
 
@@ -195,8 +296,29 @@ def shop_catalog_manage(request, shop_id: int):
 @csrf_exempt
 def shop_catalog_item_manage(request, shop_id: int, item_id: int):
     """
-    PATCH: обновить (например, доступность, цену, описание)
-    DELETE: удалить позицию каталога
+    Управление конкретным товаром каталога: обновление (PATCH) или удаление (DELETE).
+
+    Доступ:
+        - Владелец магазина (роль SHOP).
+        - Администратор.
+
+    HTTP методы:
+        - PATCH: обновление полей товара (name, description, price, is_available, section_id).
+        - DELETE: удаление товара.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        shop_id (int): ID магазина.
+        item_id (int): ID товара.
+
+    Returns:
+        JsonResponse: При PATCH – обновлённые данные товара.
+                      При DELETE – {"detail": "Deleted"}.
+
+    Raises:
+        403: Недостаточно прав.
+        404: Магазин или товар не найден.
+        400: Некорректные данные (неверный JSON или цена).
     """
     user: User = request.user  # type: ignore
 
@@ -268,8 +390,32 @@ def shop_catalog_item_manage(request, shop_id: int, item_id: int):
 @csrf_exempt
 def shop_sections_manage(request, shop_id: int):
     """
-    GET: список разделов магазина
-    POST: создать раздел
+    Управление разделами каталога магазина.
+
+    Доступ:
+        - Владелец магазина (роль SHOP).
+        - Администратор.
+
+    HTTP методы:
+        - GET: список разделов магазина.
+        - POST: создание нового раздела.
+
+    При POST:
+        Обязательное поле: name (str).
+        Опциональное поле: ordering (int, по умолчанию 0).
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        shop_id (int): ID магазина.
+
+    Returns:
+        JsonResponse: При GET – список разделов (id, name, ordering).
+                      При POST – данные созданного раздела с HTTP 201.
+
+    Raises:
+        403: Недостаточно прав.
+        404: Магазин не найден.
+        400: Некорректные данные (отсутствует name).
     """
     user: User = request.user  # type: ignore
 
@@ -318,8 +464,29 @@ def shop_sections_manage(request, shop_id: int):
 @csrf_exempt
 def shop_section_item_manage(request, shop_id: int, section_id: int):
     """
-    PATCH: обновить раздел (например имя)
-    DELETE: удалить раздел (позиции останутся без раздела)
+    Управление конкретным разделом каталога: обновление (PATCH) или удаление (DELETE).
+
+    Доступ:
+        - Владелец магазина (роль SHOP).
+        - Администратор.
+
+    HTTP методы:
+        - PATCH: обновление полей раздела (name, ordering).
+        - DELETE: удаление раздела. Товары, привязанные к разделу, получают section = NULL (не удаляются).
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        shop_id (int): ID магазина.
+        section_id (int): ID раздела.
+
+    Returns:
+        JsonResponse: При PATCH – обновлённые данные раздела.
+                      При DELETE – {"detail": "Deleted"}.
+
+    Raises:
+        403: Недостаточно прав.
+        404: Магазин или раздел не найден.
+        400: Некорректные данные (неверный JSON).
     """
     user: User = request.user  # type: ignore
 
@@ -340,7 +507,6 @@ def shop_section_item_manage(request, shop_id: int, section_id: int):
         return JsonResponse({"detail": "Section not found"}, status=404)
 
     if request.method == "DELETE":
-        # Отвязываем блюда от раздела, но не удаляем сами блюда
         CatalogItem.objects.filter(section=section).update(section=None)
         section.delete()
         return JsonResponse({"detail": "Deleted"}, status=200)
@@ -367,12 +533,33 @@ def shop_section_item_manage(request, shop_id: int, section_id: int):
 @login_required
 def shop_stats(request, shop_id: int):
     """
-    Статистика по заказам магазина:
-    - totals (выручка, кол-во заказов, средний чек, доставлено, отменено)
-    - распределение по статусам
-    - топ товаров
-    - динамика по дням
-    - по дням недели
+    Возвращает расширенную статистику по заказам магазина.
+
+    Доступ:
+        - Владелец магазина (роль SHOP).
+        - Администратор.
+
+    Параметры запроса (GET):
+        - period (str, опционально): today | 7d | 30d | all. По умолчанию 7d.
+
+    Возвращаемые данные:
+        - period, from, to – период статистики.
+        - totals: общее число заказов, доставленных, отменённых, выручка, средний чек.
+        - status_counts: количество заказов по каждому статусу.
+        - top_items: топ-10 товаров по количеству продаж и выручке.
+        - by_day: динамика заказов и выручки по дням.
+        - orders_by_weekday: распределение по дням недели.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        shop_id (int): ID магазина.
+
+    Returns:
+        JsonResponse: Объект со статистикой.
+
+    Raises:
+        403: Недостаточно прав.
+        404: Магазин не найден.
     """
     user: User = request.user  # type: ignore
 
@@ -387,7 +574,6 @@ def shop_stats(request, shop_id: int):
     if user.role == User.Roles.SHOP and shop.owner_id != user.id:
         return JsonResponse({"detail": "Forbidden"}, status=403)
 
-    # ----- период -----
     period = request.GET.get("period", "7d")  # today | 7d | 30d | all
     now = timezone.now()
     start = None
@@ -407,7 +593,6 @@ def shop_stats(request, shop_id: int):
     if start is not None:
         qs = qs.filter(created_at__gte=start)
 
-    # --- базовые группы ---
     total_orders = qs.count()
     delivered_qs = qs.filter(status=Order.Status.DELIVERED)
     cancelled_qs = qs.filter(status=Order.Status.CANCELLED)
@@ -416,7 +601,6 @@ def shop_stats(request, shop_id: int):
     delivered_count = delivered_qs.count()
     cancelled_count = cancelled_qs.count()
 
-    # Выручка и средний чек считаем по НЕ отменённым заказам
     revenue_agg = non_cancelled_qs.aggregate(total=Sum("total_price"))
     revenue: Decimal = revenue_agg["total"] or Decimal("0.00")
 
@@ -426,7 +610,6 @@ def shop_stats(request, shop_id: int):
     else:
         avg_check = Decimal("0.00")
 
-    # ----- статусные счётчики -----
     status_counts_raw = (
         qs.values("status")
         .annotate(count=Count("id"))
@@ -437,7 +620,6 @@ def shop_stats(request, shop_id: int):
     for row in status_counts_raw:
         status_counts[row["status"]] = row["count"]
 
-    # ----- топ блюд (по НЕ отменённым заказам) -----
     items_qs = (
         OrderItem.objects
         .filter(order__shop=shop)
@@ -473,7 +655,6 @@ def shop_stats(request, shop_id: int):
         for row in top_items_raw
     ]
 
-    # ----- по дням (не отменённые) -----
     by_day_raw = (
         non_cancelled_qs
         .annotate(day=TruncDate("created_at"))
@@ -494,7 +675,6 @@ def shop_stats(request, shop_id: int):
         for row in by_day_raw
     ]
 
-    # ----- по дням недели (не отменённые) -----
     weekday_raw = (
         non_cancelled_qs
         .annotate(dow=ExtractWeekDay("created_at"))  # 1..7
@@ -506,8 +686,6 @@ def shop_stats(request, shop_id: int):
         .order_by("dow")
     )
 
-    # map weekday number -> label
-    # В PostgreSQL 1 = воскресенье, 2 = понедельник, ..., 7 = суббота
     weekday_labels = {
         1: "Вс",
         2: "Пн",
