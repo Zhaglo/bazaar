@@ -2,9 +2,25 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 class User(AbstractUser):
+    """
+    Расширенная модель пользователя для платформы доставки BAZAAR.
+
+    Наследуется от стандартной модели AbstractUser Django.
+    Добавляет поле role для разделения пользователей по ролям,
+    а также поля display_name и phone для дополнительной информации.
+
+    Attributes:
+        role (CharField): Роль пользователя в системе.
+            Возможные значения: CLIENT (клиент), SHOP (магазин/партнёр),
+            COURIER (курьер), ADMIN (администратор).
+        display_name (CharField): Отображаемое имя пользователя (опционально).
+        phone (CharField): Номер телефона пользователя (опционально).
+    """
+
     class Roles(models.TextChoices):
+        """Допустимые роли пользователей в системе."""
         CLIENT = "CLIENT", "client"
-        RESTAURANT = "SHOP", "shop"
+        SHOP = "SHOP", "shop"
         COURIER = "COURIER", "courier"
         ADMIN = "ADMIN", "admin"
 
@@ -14,7 +30,6 @@ class User(AbstractUser):
         default=Roles.CLIENT,
     )
 
-    # Новые поля
     display_name = models.CharField(
         max_length=255,
         blank=True,
@@ -30,4 +45,11 @@ class User(AbstractUser):
     )
 
     def __str__(self):
+        """
+        Возвращает строковое представление пользователя.
+
+        Returns:
+            str: Строка вида 'display_name (role)' или 'username (role)',
+                 если display_name не задан.
+        """
         return f'{self.display_name or self.username} ({self.role})'
