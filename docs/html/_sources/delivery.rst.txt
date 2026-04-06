@@ -1,0 +1,21 @@
+delivery package
+================
+
+delivery.views module
+---------------------
+
+.. automodule:: delivery.views
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-special-members:
+
+
+delivery.models module
+----------------------
+
+.. automodule:: delivery.models
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-special-members:

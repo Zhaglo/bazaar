@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+
+<html lang="ru" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>delivery.views &#8212; документация BAZAAR 1.0</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=9ca2116e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/translations.js?v=cd1d70c9"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Исходный код delivery.views</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">JsonResponse</span><span class="p">,</span> <span class="n">Http404</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.views.decorators.csrf</span><span class="w"> </span><span class="kn">import</span> <span class="n">csrf_exempt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">transaction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">timezone</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeliveryTask</span><span class="p">,</span> <span class="n">CourierProfile</span><span class="p">,</span> <span class="n">CourierApplication</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">users.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">User</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">orders.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Order</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Извлекает и декодирует JSON из тела HTTP-запроса.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект HTTP-запроса Django.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict | None: Словарь, полученный из JSON, или None, если JSON некорректен.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+    <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="delivery_task_list">
+<a class="viewcode-back" href="../../delivery.html#delivery.views.delivery_task_list">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">delivery_task_list</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Возвращает список задач доставки для текущего пользователя.</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Курьер: видит только свои задачи.</span>
+<span class="sd">        - Администратор: видит все задачи.</span>
+<span class="sd">        - Другие роли (клиент, партнёр) получают 403.</span>
+
+<span class="sd">    HTTP метод: GET</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Список задач с деталями заказа (клиент, магазин, адрес, сумма).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        401: Пользователь не аутентифицирован.</span>
+<span class="sd">        403: Роль не разрешена (не курьер и не админ).</span>
+<span class="sd">        404: Профиль курьера не найден (для роли курьера).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;GET&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Authentication required&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">401</span><span class="p">)</span>
+
+    <span class="n">qs</span> <span class="o">=</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span>
+        <span class="s1">&#39;order__shop&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;order__client&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;courier__user&#39;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">COURIER</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">courier_profile</span> <span class="o">=</span> <span class="n">CourierProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CourierProfile</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Courier profile not found&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+        <span class="n">qs</span> <span class="o">=</span> <span class="n">qs</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">courier</span><span class="o">=</span><span class="n">courier_profile</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">qs</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s1">&#39;status&#39;</span><span class="p">,</span> <span class="s1">&#39;-assigned_at&#39;</span><span class="p">):</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">order</span>
+        <span class="n">client</span> <span class="o">=</span> <span class="n">order</span><span class="o">.</span><span class="n">client</span>
+
+        <span class="n">client_phone</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s2">&quot;phone&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">client_name</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s1">&#39;display_name&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">client</span><span class="o">.</span><span class="n">username</span>
+
+        <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;order_id&#39;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">order_id</span><span class="p">,</span>
+                <span class="s1">&#39;status&#39;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+                <span class="s1">&#39;courier_id&#39;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">courier_id</span><span class="p">,</span>
+                <span class="s1">&#39;client_id&#39;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">client_id</span><span class="p">,</span>
+                <span class="s1">&#39;client_username&#39;</span><span class="p">:</span> <span class="n">client_name</span><span class="p">,</span>
+                <span class="s1">&#39;client_phone&#39;</span><span class="p">:</span> <span class="n">client_phone</span><span class="p">,</span>
+                <span class="s1">&#39;shop_id&#39;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">shop_id</span><span class="p">,</span>
+                <span class="s1">&#39;shop_name&#39;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">shop</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="s1">&#39;delivery_address&#39;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">delivery_address</span><span class="p">,</span>
+                <span class="s1">&#39;order_total_price&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">order</span><span class="o">.</span><span class="n">total_price</span><span class="p">),</span>
+                <span class="s1">&#39;order_created_at&#39;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">safe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ensure_ascii&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="delivery_offers_list">
+<a class="viewcode-back" href="../../delivery.html#delivery.views.delivery_offers_list">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">delivery_offers_list</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Возвращает список свободных (доступных) задач доставки для курьеров.</span>
+
+<span class="sd">    Условия отбора:</span>
+<span class="sd">        - Статус задачи = PENDING.</span>
+<span class="sd">        - Поле courier = NULL (задача не назначена).</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Курьер: требуется активный профиль.</span>
+<span class="sd">        - Администратор: может просматривать офферы.</span>
+
+<span class="sd">    HTTP метод: GET</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Список свободных задач с информацией о заказе.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        401: Пользователь не аутентифицирован.</span>
+<span class="sd">        403: Неверная роль или профиль курьера не активен.</span>
+<span class="sd">        404: Профиль курьера не найден.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s2">&quot;GET&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Method not allowed&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Authentication required&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">401</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">COURIER</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">COURIER</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">courier_profile</span> <span class="o">=</span> <span class="n">CourierProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CourierProfile</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Courier profile not found&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">courier_profile</span><span class="o">.</span><span class="n">is_active</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Courier profile is not active&quot;</span><span class="p">},</span>
+                <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="n">qs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">objects</span>
+        <span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s2">&quot;order__shop&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+            <span class="n">status</span><span class="o">=</span><span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">PENDING</span><span class="p">,</span>
+            <span class="n">courier__isnull</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">qs</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;-order__created_at&quot;</span><span class="p">):</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">order</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s2">&quot;order_id&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+                <span class="s2">&quot;shop_id&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">shop_id</span><span class="p">,</span>
+                <span class="s2">&quot;shop_name&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">shop</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="s2">&quot;client_id&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">client_id</span><span class="p">,</span>
+                <span class="s2">&quot;delivery_address&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">delivery_address</span><span class="p">,</span>
+                <span class="s2">&quot;order_total_price&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">order</span><span class="o">.</span><span class="n">total_price</span><span class="p">),</span>
+                <span class="s2">&quot;order_created_at&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">safe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="delivery_task_assign">
+<a class="viewcode-back" href="../../delivery.html#delivery.views.delivery_task_assign">[документация]</a>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">delivery_task_assign</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">task_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Назначает задачу доставки текущему курьеру (или админу).</span>
+
+<span class="sd">    Правила назначения:</span>
+<span class="sd">        - Задача должна быть в статусе PENDING и не иметь курьера.</span>
+<span class="sd">        - Курьер должен иметь активный профиль.</span>
+<span class="sd">        - У курьера не должно быть других активных задач (ASSIGNED/IN_PROGRESS).</span>
+<span class="sd">        - Используется блокировка SELECT FOR UPDATE для защиты от гонок.</span>
+
+<span class="sd">    HTTP метод: POST</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+<span class="sd">        task_id (int): Идентификатор задачи доставки.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Обновлённые данные задачи (id, статус, заказ, курьер).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        401: Пользователь не аутентифицирован.</span>
+<span class="sd">        403: Недостаточно прав или курьер не активен.</span>
+<span class="sd">        404: Задача не найдена.</span>
+<span class="sd">        400: Задача уже занята, не в PENDING, или у курьера есть активная задача.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Method not allowed&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Authentication required&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">401</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">COURIER</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="n">courier_profile</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">COURIER</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">courier_profile</span> <span class="o">=</span> <span class="n">CourierProfile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CourierProfile</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Courier profile not found&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">courier_profile</span><span class="o">.</span><span class="n">is_active</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Courier profile is not active&quot;</span><span class="p">},</span>
+                <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">has_active</span> <span class="o">=</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+            <span class="n">courier</span><span class="o">=</span><span class="n">courier_profile</span><span class="p">,</span>
+            <span class="n">status__in</span><span class="o">=</span><span class="p">[</span>
+                <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">ASSIGNED</span><span class="p">,</span>
+                <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">IN_PROGRESS</span><span class="p">,</span>
+            <span class="p">],</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">has_active</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;У вас уже есть активная задача. &quot;</span>
+                    <span class="s2">&quot;Завершите её прежде чем брать новую.&quot;</span>
+                <span class="p">},</span>
+                <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">transaction</span><span class="o">.</span><span class="n">atomic</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">task</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">objects</span>
+                <span class="o">.</span><span class="n">select_for_update</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">task_id</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">Http404</span><span class="p">(</span><span class="s2">&quot;Delivery task not found&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">task</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">PENDING</span> <span class="ow">or</span> <span class="n">task</span><span class="o">.</span><span class="n">courier_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Task is already taken or not in PENDING status&quot;</span><span class="p">},</span>
+                <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">COURIER</span><span class="p">:</span>
+            <span class="n">task</span><span class="o">.</span><span class="n">courier</span> <span class="o">=</span> <span class="n">courier_profile</span>
+
+        <span class="n">task</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">ASSIGNED</span>
+        <span class="n">task</span><span class="o">.</span><span class="n">assigned_at</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="n">task</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="n">order</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">order</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+            <span class="s2">&quot;order_id&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;courier_id&quot;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">courier_id</span><span class="p">,</span>
+            <span class="s2">&quot;delivery_address&quot;</span><span class="p">:</span> <span class="n">order</span><span class="o">.</span><span class="n">delivery_address</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="delivery_task_change_status">
+<a class="viewcode-back" href="../../delivery.html#delivery.views.delivery_task_change_status">[документация]</a>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">delivery_task_change_status</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">task_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Изменяет статус задачи доставки.</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Курьер: только для своих задач.</span>
+<span class="sd">        - Администратор: для любых задач.</span>
+
+<span class="sd">    При изменении статуса синхронизируется статус связанного заказа:</span>
+<span class="sd">        - IN_PROGRESS → Order.Status.ON_DELIVERY</span>
+<span class="sd">        - DONE → Order.Status.DELIVERED</span>
+
+<span class="sd">    HTTP метод: PATCH</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса. Тело должно содержать JSON с ключом &#39;status&#39;.</span>
+<span class="sd">        task_id (int): Идентификатор задачи доставки.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Новый статус задачи.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        401: Пользователь не аутентифицирован.</span>
+<span class="sd">        403: Недостаточно прав (не свой заказ и не админ).</span>
+<span class="sd">        404: Задача не найдена.</span>
+<span class="sd">        400: Неверный JSON или недопустимое значение статуса.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;PATCH&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Authentication required&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">401</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">task</span> <span class="o">=</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s1">&#39;courier__user&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">task_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">Http404</span><span class="p">(</span><span class="s1">&#39;Delivery task not found&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">COURIER</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">task</span><span class="o">.</span><span class="n">courier</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">task</span><span class="o">.</span><span class="n">courier</span><span class="o">.</span><span class="n">user_id</span> <span class="o">!=</span> <span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">!=</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="n">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid JSON&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="n">new_status</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;status&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">new_status</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Invalid status. Allowed: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">values</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">},</span>
+            <span class="n">status</span><span class="o">=</span><span class="mi">400</span>
+        <span class="p">)</span>
+
+    <span class="n">task</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">new_status</span>
+    <span class="n">task</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">new_status</span> <span class="o">==</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">IN_PROGRESS</span><span class="p">:</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">order</span>
+        <span class="n">order</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">Order</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">ON_DELIVERY</span>
+        <span class="n">order</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">new_status</span> <span class="o">==</span> <span class="n">DeliveryTask</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">DONE</span><span class="p">:</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">order</span>
+        <span class="n">order</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">Order</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">DELIVERED</span>
+        <span class="n">order</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;status&#39;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ensure_ascii&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="courier_application_create">
+<a class="viewcode-back" href="../../delivery.html#delivery.views.courier_application_create">[документация]</a>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">courier_application_create</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Создаёт заявку на регистрацию курьером.</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Анонимные пользователи (гости) могут оставить заявку.</span>
+<span class="sd">        - Аутентифицированные пользователи также могут (связь с профилем).</span>
+
+<span class="sd">    Обязательные поля в JSON:</span>
+<span class="sd">        - full_name (str): ФИО заявителя.</span>
+<span class="sd">        - phone (str): Контактный телефон.</span>
+
+<span class="sd">    Опциональные поля:</span>
+<span class="sd">        - vehicle_type (str): Тип транспорта.</span>
+<span class="sd">        - comment (str): Комментарий.</span>
+
+<span class="sd">    HTTP метод: POST</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Данные созданной заявки (id, статус, full_name, phone) с HTTP 201.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        405: Неверный HTTP метод.</span>
+<span class="sd">        400: Отсутствует JSON или не заполнены обязательные поля (full_name, phone).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Method not allowed&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="n">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Invalid JSON&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="n">full_name</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;full_name&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">phone</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;phone&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">vehicle_type</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;vehicle_type&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">comment</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;comment&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">full_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">phone</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;full_name и phone обязательны&quot;</span><span class="p">},</span>
+            <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="n">app</span> <span class="o">=</span> <span class="n">CourierApplication</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+        <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+        <span class="n">full_name</span><span class="o">=</span><span class="n">full_name</span><span class="p">,</span>
+        <span class="n">phone</span><span class="o">=</span><span class="n">phone</span><span class="p">,</span>
+        <span class="n">vehicle_type</span><span class="o">=</span><span class="n">vehicle_type</span><span class="p">,</span>
+        <span class="n">comment</span><span class="o">=</span><span class="n">comment</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+            <span class="s2">&quot;full_name&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">full_name</span><span class="p">,</span>
+            <span class="s2">&quot;phone&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">phone</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">status</span><span class="o">=</span><span class="mi">201</span><span class="p">,</span>
+        <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">BAZAAR</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Искать" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Навигация</h3>
+<p class="caption" role="heading"><span class="caption-text">Модули приложений</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Приложения проекта</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Код модуля</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Жагло И.Д., Запрягаев М.А., Коротков А.А., Красоткин А.А., Лясковский Т.М..
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

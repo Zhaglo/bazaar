@@ -1,0 +1,20 @@
+users package
+=============
+
+users.views module
+------------------
+
+.. automodule:: users.views
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-special-members:
+
+users.models module
+-------------------
+
+.. automodule:: users.models
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-special-members:

@@ -1,0 +1,10 @@
+Приложения проекта
+==================
+
+.. toctree::
+   :maxdepth: 2
+
+   delivery
+   orders
+   shops
+   users

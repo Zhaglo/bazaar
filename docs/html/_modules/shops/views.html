@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+
+<html lang="ru" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>shops.views &#8212; документация BAZAAR 1.0</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=9ca2116e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/translations.js?v=cd1d70c9"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Исходный код shops.views</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">decimal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Decimal</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">date</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.contrib.auth.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">login_required</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.views.decorators.csrf</span><span class="w"> </span><span class="kn">import</span> <span class="n">csrf_exempt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">JsonResponse</span><span class="p">,</span> <span class="n">Http404</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">timezone</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Count</span><span class="p">,</span> <span class="n">Sum</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">DecimalField</span><span class="p">,</span> <span class="n">ExpressionWrapper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db.models.functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TruncDate</span><span class="p">,</span> <span class="n">ExtractWeekDay</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Shop</span><span class="p">,</span> <span class="n">CatalogItem</span><span class="p">,</span> <span class="n">CatalogSection</span><span class="p">,</span> <span class="n">ShopApplication</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">orders.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Order</span><span class="p">,</span> <span class="n">OrderItem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">users.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">User</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Извлекает и декодирует JSON из тела HTTP-запроса.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект HTTP-запроса Django.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict | None: Словарь, полученный из JSON, или None, если JSON некорректен.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+    <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="shop_list">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_list">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_list</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Возвращает список всех магазинов, зарегистрированных на платформе.</span>
+
+<span class="sd">    Доступ: публичный (без авторизации).</span>
+
+<span class="sd">    HTTP метод: GET</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Список магазинов с полями id, name, address, description.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;GET&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">shops</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;address&#39;</span><span class="p">,</span> <span class="s1">&#39;description&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">shops</span><span class="p">),</span> <span class="n">safe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ensure_ascii&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="shop_catalog">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_catalog">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_catalog</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">shop_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Возвращает каталог товаров указанного магазина.</span>
+
+<span class="sd">    Доступ: публичный (без авторизации).</span>
+
+<span class="sd">    HTTP метод: GET</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+<span class="sd">        shop_id (int): Идентификатор магазина.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Объект с полями shop (id, name, address) и catalog (список товаров).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        404: Магазин не найден.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;GET&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">shop</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">shop_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Shop</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">Http404</span><span class="p">(</span><span class="s1">&#39;Shop not found&#39;</span><span class="p">)</span>
+
+    <span class="n">items</span> <span class="o">=</span> <span class="n">shop</span><span class="o">.</span><span class="n">catalog_items</span><span class="o">.</span><span class="n">all</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">(</span>
+        <span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;description&#39;</span><span class="p">,</span> <span class="s1">&#39;price&#39;</span><span class="p">,</span> <span class="s1">&#39;section_id&#39;</span><span class="p">,</span> <span class="s1">&#39;is_available&#39;</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s1">&#39;shop&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">shop</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">shop</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="s1">&#39;address&#39;</span><span class="p">:</span> <span class="n">shop</span><span class="o">.</span><span class="n">address</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="s1">&#39;catalog&#39;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">items</span><span class="p">),</span>
+        <span class="p">},</span>
+        <span class="n">safe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ensure_ascii&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="shop_application_create">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_application_create">[документация]</a>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_application_create</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Создаёт заявку на регистрацию нового магазина.</span>
+
+<span class="sd">    Может вызываться как авторизованным пользователем, так и гостем.</span>
+
+<span class="sd">    Обязательные поля в JSON:</span>
+<span class="sd">        - shop_name (str): Название магазина.</span>
+<span class="sd">        - address (str): Адрес магазина.</span>
+<span class="sd">        - contact_name (str): Контактное лицо.</span>
+<span class="sd">        - contact_phone (str): Телефон для связи.</span>
+
+<span class="sd">    Опциональные поля:</span>
+<span class="sd">        - description (str): Описание магазина.</span>
+<span class="sd">        - comment (str): Дополнительный комментарий.</span>
+
+<span class="sd">    HTTP метод: POST</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Данные созданной заявки (id, status, shop_name, contact_name, contact_phone) с HTTP 201.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Method not allowed&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="n">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Invalid JSON&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="n">shop_name</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shop_name&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">address</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;address&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;description&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">contact_name</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;contact_name&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">contact_phone</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;contact_phone&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">comment</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;comment&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">shop_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">address</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">contact_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">contact_phone</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;shop_name, address, contact_name и contact_phone обязательны&quot;</span><span class="p">},</span>
+            <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span> <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="n">app</span> <span class="o">=</span> <span class="n">ShopApplication</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+        <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+        <span class="n">shop_name</span><span class="o">=</span><span class="n">shop_name</span><span class="p">,</span>
+        <span class="n">address</span><span class="o">=</span><span class="n">address</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">,</span>
+        <span class="n">contact_name</span><span class="o">=</span><span class="n">contact_name</span><span class="p">,</span>
+        <span class="n">contact_phone</span><span class="o">=</span><span class="n">contact_phone</span><span class="p">,</span>
+        <span class="n">comment</span><span class="o">=</span><span class="n">comment</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+            <span class="s2">&quot;shop_name&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">shop_name</span><span class="p">,</span>
+            <span class="s2">&quot;contact_name&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">contact_name</span><span class="p">,</span>
+            <span class="s2">&quot;contact_phone&quot;</span><span class="p">:</span> <span class="n">app</span><span class="o">.</span><span class="n">contact_phone</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">status</span><span class="o">=</span><span class="mi">201</span><span class="p">,</span>
+        <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="my_shops">
+<a class="viewcode-back" href="../../shops.html#shops.views.my_shops">[документация]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_shops</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Возвращает список магазинов, принадлежащих текущему пользователю.</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Пользователь с ролью SHOP (владелец магазина).</span>
+<span class="sd">        - Администратор (видит все свои магазины, если создавал).</span>
+
+<span class="sd">    HTTP метод: GET</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Список магазинов с полями id, name, address, description.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        403: Пользователь не имеет роли SHOP или ADMIN.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="n">qs</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">(</span>
+        <span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;address&#39;</span><span class="p">,</span> <span class="s1">&#39;description&#39;</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">qs</span><span class="p">),</span> <span class="n">safe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ensure_ascii&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span></div>
+
+
+
+<div class="viewcode-block" id="shop_catalog_manage">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_catalog_manage">[документация]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_catalog_manage</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">shop_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Управление каталогом магазина: создание нового товара.</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Владелец магазина (роль SHOP).</span>
+<span class="sd">        - Администратор.</span>
+
+<span class="sd">    HTTP метод: POST</span>
+
+<span class="sd">    Тело запроса (JSON):</span>
+<span class="sd">        - name (str, обязательное): Название товара.</span>
+<span class="sd">        - price (decimal, обязательное): Цена.</span>
+<span class="sd">        - description (str, опционально): Описание.</span>
+<span class="sd">        - is_available (bool, опционально, по умолчанию True): Доступность.</span>
+<span class="sd">        - section_id (int, опционально): ID раздела каталога.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+<span class="sd">        shop_id (int): ID магазина.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Данные созданного товара (id, section_id, name, description, price, is_available) с HTTP 201.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        403: Недостаточно прав или магазин не принадлежит пользователю.</span>
+<span class="sd">        404: Магазин или раздел не найден.</span>
+<span class="sd">        400: Некорректные данные (отсутствуют обязательные поля, неверная цена).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">shop</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">shop_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Shop</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Shop not found&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span> <span class="ow">and</span> <span class="n">shop</span><span class="o">.</span><span class="n">owner_id</span> <span class="o">!=</span> <span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;POST&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="n">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid JSON&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;description&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">price_raw</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;price&#39;</span><span class="p">)</span>
+    <span class="n">is_available</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;is_available&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">))</span>
+    <span class="n">section_id</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;section_id&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span> <span class="ow">or</span> <span class="n">price_raw</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;name и price обязательны&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">price</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">price_raw</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Некорректная цена&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+    <span class="n">section</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">section_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">section</span> <span class="o">=</span> <span class="n">CatalogSection</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">section_id</span><span class="p">,</span> <span class="n">shop</span><span class="o">=</span><span class="n">shop</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CatalogSection</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Section not found&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="n">item</span> <span class="o">=</span> <span class="n">CatalogItem</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+        <span class="n">shop</span><span class="o">=</span><span class="n">shop</span><span class="p">,</span>
+        <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">,</span>
+        <span class="n">price</span><span class="o">=</span><span class="n">price</span><span class="p">,</span>
+        <span class="n">is_available</span><span class="o">=</span><span class="n">is_available</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;section_id&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">section_id</span><span class="p">,</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="s1">&#39;description&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+            <span class="s1">&#39;price&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">price</span><span class="p">),</span>
+            <span class="s1">&#39;is_available&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">is_available</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">status</span><span class="o">=</span><span class="mi">201</span><span class="p">,</span>
+        <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ensure_ascii&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="shop_catalog_item_manage">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_catalog_item_manage">[документация]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_catalog_item_manage</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">shop_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">item_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Управление конкретным товаром каталога: обновление (PATCH) или удаление (DELETE).</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Владелец магазина (роль SHOP).</span>
+<span class="sd">        - Администратор.</span>
+
+<span class="sd">    HTTP методы:</span>
+<span class="sd">        - PATCH: обновление полей товара (name, description, price, is_available, section_id).</span>
+<span class="sd">        - DELETE: удаление товара.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+<span class="sd">        shop_id (int): ID магазина.</span>
+<span class="sd">        item_id (int): ID товара.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: При PATCH – обновлённые данные товара.</span>
+<span class="sd">                      При DELETE – {&quot;detail&quot;: &quot;Deleted&quot;}.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        403: Недостаточно прав.</span>
+<span class="sd">        404: Магазин или товар не найден.</span>
+<span class="sd">        400: Некорректные данные (неверный JSON или цена).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">shop</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">shop_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Shop</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Shop not found&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span> <span class="ow">and</span> <span class="n">shop</span><span class="o">.</span><span class="n">owner_id</span> <span class="o">!=</span> <span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Forbidden&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="n">CatalogItem</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">item_id</span><span class="p">,</span> <span class="n">shop</span><span class="o">=</span><span class="n">shop</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">CatalogItem</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Catalog item not found&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;DELETE&#39;</span><span class="p">:</span>
+        <span class="n">item</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Deleted&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;PATCH&#39;</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid JSON&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s1">&#39;name&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">item</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s1">&#39;description&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">item</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s1">&#39;is_available&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">item</span><span class="o">.</span><span class="n">is_available</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;is_available&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="s1">&#39;price&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">item</span><span class="o">.</span><span class="n">price</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;price&#39;</span><span class="p">]))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Некорректная цена&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;section_id&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">section_id</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;section_id&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">section_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">item</span><span class="o">.</span><span class="n">section</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">section</span> <span class="o">=</span> <span class="n">CatalogSection</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">section_id</span><span class="p">,</span> <span class="n">shop</span><span class="o">=</span><span class="n">shop</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">CatalogSection</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Section not found&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+                <span class="n">item</span><span class="o">.</span><span class="n">section</span> <span class="o">=</span> <span class="n">section</span>
+
+        <span class="n">item</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="s1">&#39;section_id&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">section_id</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="s1">&#39;description&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+                <span class="s1">&#39;price&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">price</span><span class="p">),</span>
+                <span class="s1">&#39;is_available&#39;</span><span class="p">:</span> <span class="n">item</span><span class="o">.</span><span class="n">is_available</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ensure_ascii&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Method not allowed&#39;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="shop_sections_manage">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_sections_manage">[документация]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_sections_manage</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">shop_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Управление разделами каталога магазина.</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Владелец магазина (роль SHOP).</span>
+<span class="sd">        - Администратор.</span>
+
+<span class="sd">    HTTP методы:</span>
+<span class="sd">        - GET: список разделов магазина.</span>
+<span class="sd">        - POST: создание нового раздела.</span>
+
+<span class="sd">    При POST:</span>
+<span class="sd">        Обязательное поле: name (str).</span>
+<span class="sd">        Опциональное поле: ordering (int, по умолчанию 0).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+<span class="sd">        shop_id (int): ID магазина.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: При GET – список разделов (id, name, ordering).</span>
+<span class="sd">                      При POST – данные созданного раздела с HTTP 201.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        403: Недостаточно прав.</span>
+<span class="sd">        404: Магазин не найден.</span>
+<span class="sd">        400: Некорректные данные (отсутствует name).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">shop</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">shop_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Shop</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Shop not found&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span> <span class="ow">and</span> <span class="n">shop</span><span class="o">.</span><span class="n">owner_id</span> <span class="o">!=</span> <span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;GET&quot;</span><span class="p">:</span>
+        <span class="n">sections</span> <span class="o">=</span> <span class="n">shop</span><span class="o">.</span><span class="n">catalog_sections</span><span class="o">.</span><span class="n">all</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;ordering&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">sections</span><span class="p">),</span> <span class="n">safe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Invalid JSON&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+        <span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">ordering</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ordering&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;name обязателен&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+        <span class="n">section</span> <span class="o">=</span> <span class="n">CatalogSection</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+            <span class="n">shop</span><span class="o">=</span><span class="n">shop</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">ordering</span><span class="o">=</span><span class="n">ordering</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">section</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">section</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;ordering&quot;</span><span class="p">:</span> <span class="n">section</span><span class="o">.</span><span class="n">ordering</span><span class="p">},</span>
+            <span class="n">status</span><span class="o">=</span><span class="mi">201</span><span class="p">,</span>
+            <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Method not allowed&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="shop_section_item_manage">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_section_item_manage">[документация]</a>
+<span class="nd">@login_required</span>
+<span class="nd">@csrf_exempt</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_section_item_manage</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">shop_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">section_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Управление конкретным разделом каталога: обновление (PATCH) или удаление (DELETE).</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Владелец магазина (роль SHOP).</span>
+<span class="sd">        - Администратор.</span>
+
+<span class="sd">    HTTP методы:</span>
+<span class="sd">        - PATCH: обновление полей раздела (name, ordering).</span>
+<span class="sd">        - DELETE: удаление раздела. Товары, привязанные к разделу, получают section = NULL (не удаляются).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+<span class="sd">        shop_id (int): ID магазина.</span>
+<span class="sd">        section_id (int): ID раздела.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: При PATCH – обновлённые данные раздела.</span>
+<span class="sd">                      При DELETE – {&quot;detail&quot;: &quot;Deleted&quot;}.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        403: Недостаточно прав.</span>
+<span class="sd">        404: Магазин или раздел не найден.</span>
+<span class="sd">        400: Некорректные данные (неверный JSON).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">shop</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">shop_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Shop</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Shop not found&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span> <span class="ow">and</span> <span class="n">shop</span><span class="o">.</span><span class="n">owner_id</span> <span class="o">!=</span> <span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">section</span> <span class="o">=</span> <span class="n">CatalogSection</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">section_id</span><span class="p">,</span> <span class="n">shop</span><span class="o">=</span><span class="n">shop</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">CatalogSection</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Section not found&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;DELETE&quot;</span><span class="p">:</span>
+        <span class="n">CatalogItem</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">section</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Deleted&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;PATCH&quot;</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">_parse_json</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Invalid JSON&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">section</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s2">&quot;ordering&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">section</span><span class="o">.</span><span class="n">ordering</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;ordering&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">section</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">section</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">section</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;ordering&quot;</span><span class="p">:</span> <span class="n">section</span><span class="o">.</span><span class="n">ordering</span><span class="p">},</span>
+            <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Method not allowed&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">405</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="shop_stats">
+<a class="viewcode-back" href="../../shops.html#shops.views.shop_stats">[документация]</a>
+<span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">shop_stats</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">shop_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Возвращает расширенную статистику по заказам магазина.</span>
+
+<span class="sd">    Доступ:</span>
+<span class="sd">        - Владелец магазина (роль SHOP).</span>
+<span class="sd">        - Администратор.</span>
+
+<span class="sd">    Параметры запроса (GET):</span>
+<span class="sd">        - period (str, опционально): today | 7d | 30d | all. По умолчанию 7d.</span>
+
+<span class="sd">    Возвращаемые данные:</span>
+<span class="sd">        - period, from, to – период статистики.</span>
+<span class="sd">        - totals: общее число заказов, доставленных, отменённых, выручка, средний чек.</span>
+<span class="sd">        - status_counts: количество заказов по каждому статусу.</span>
+<span class="sd">        - top_items: топ-10 товаров по количеству продаж и выручке.</span>
+<span class="sd">        - by_day: динамика заказов и выручки по дням.</span>
+<span class="sd">        - orders_by_weekday: распределение по дням недели.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        request (HttpRequest): Объект запроса.</span>
+<span class="sd">        shop_id (int): ID магазина.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        JsonResponse: Объект со статистикой.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        403: Недостаточно прав.</span>
+<span class="sd">        404: Магазин не найден.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">user</span><span class="p">:</span> <span class="n">User</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span><span class="p">,</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">ADMIN</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">shop</span> <span class="o">=</span> <span class="n">Shop</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">shop_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">Shop</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Shop not found&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="n">User</span><span class="o">.</span><span class="n">Roles</span><span class="o">.</span><span class="n">SHOP</span> <span class="ow">and</span> <span class="n">shop</span><span class="o">.</span><span class="n">owner_id</span> <span class="o">!=</span> <span class="n">user</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s2">&quot;detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Forbidden&quot;</span><span class="p">},</span> <span class="n">status</span><span class="o">=</span><span class="mi">403</span><span class="p">)</span>
+
+    <span class="n">period</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;period&quot;</span><span class="p">,</span> <span class="s2">&quot;7d&quot;</span><span class="p">)</span>  <span class="c1"># today | 7d | 30d | all</span>
+    <span class="n">now</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="n">period</span> <span class="o">==</span> <span class="s2">&quot;today&quot;</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">now</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">hour</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">minute</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">second</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">microsecond</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">period</span> <span class="o">==</span> <span class="s2">&quot;7d&quot;</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">now</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">period</span> <span class="o">==</span> <span class="s2">&quot;30d&quot;</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">now</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">period</span> <span class="o">==</span> <span class="s2">&quot;all&quot;</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">now</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+
+    <span class="n">qs</span> <span class="o">=</span> <span class="n">Order</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">shop</span><span class="o">=</span><span class="n">shop</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">qs</span> <span class="o">=</span> <span class="n">qs</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">created_at__gte</span><span class="o">=</span><span class="n">start</span><span class="p">)</span>
+
+    <span class="n">total_orders</span> <span class="o">=</span> <span class="n">qs</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+    <span class="n">delivered_qs</span> <span class="o">=</span> <span class="n">qs</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">Order</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">DELIVERED</span><span class="p">)</span>
+    <span class="n">cancelled_qs</span> <span class="o">=</span> <span class="n">qs</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">Order</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">)</span>
+    <span class="n">non_cancelled_qs</span> <span class="o">=</span> <span class="n">qs</span><span class="o">.</span><span class="n">exclude</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">Order</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">)</span>
+
+    <span class="n">delivered_count</span> <span class="o">=</span> <span class="n">delivered_qs</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+    <span class="n">cancelled_count</span> <span class="o">=</span> <span class="n">cancelled_qs</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+
+    <span class="n">revenue_agg</span> <span class="o">=</span> <span class="n">non_cancelled_qs</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s2">&quot;total_price&quot;</span><span class="p">))</span>
+    <span class="n">revenue</span><span class="p">:</span> <span class="n">Decimal</span> <span class="o">=</span> <span class="n">revenue_agg</span><span class="p">[</span><span class="s2">&quot;total&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.00&quot;</span><span class="p">)</span>
+
+    <span class="n">non_cancelled_count</span> <span class="o">=</span> <span class="n">non_cancelled_qs</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">non_cancelled_count</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">avg_check</span> <span class="o">=</span> <span class="p">(</span><span class="n">revenue</span> <span class="o">/</span> <span class="n">non_cancelled_count</span><span class="p">)</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.01&quot;</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">avg_check</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.00&quot;</span><span class="p">)</span>
+
+    <span class="n">status_counts_raw</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">qs</span><span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s2">&quot;status&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="n">Count</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">order_by</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="n">all_statuses</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">Order</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">choices</span><span class="p">]</span>
+    <span class="n">status_counts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">s</span><span class="p">:</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">all_statuses</span><span class="p">}</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">status_counts_raw</span><span class="p">:</span>
+        <span class="n">status_counts</span><span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span>
+
+    <span class="n">items_qs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">OrderItem</span><span class="o">.</span><span class="n">objects</span>
+        <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">order__shop</span><span class="o">=</span><span class="n">shop</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">exclude</span><span class="p">(</span><span class="n">order__status</span><span class="o">=</span><span class="n">Order</span><span class="o">.</span><span class="n">Status</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">items_qs</span> <span class="o">=</span> <span class="n">items_qs</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">order__created_at__gte</span><span class="o">=</span><span class="n">start</span><span class="p">)</span>
+
+    <span class="n">items_qs</span> <span class="o">=</span> <span class="n">items_qs</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+        <span class="n">line_total</span><span class="o">=</span><span class="n">ExpressionWrapper</span><span class="p">(</span>
+            <span class="n">F</span><span class="p">(</span><span class="s2">&quot;price_at_moment&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="n">F</span><span class="p">(</span><span class="s2">&quot;quantity&quot;</span><span class="p">),</span>
+            <span class="n">output_field</span><span class="o">=</span><span class="n">DecimalField</span><span class="p">(</span><span class="n">max_digits</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">decimal_places</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">top_items_raw</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">items_qs</span>
+        <span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s2">&quot;catalog_item_id&quot;</span><span class="p">,</span> <span class="s2">&quot;catalog_item__name&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+            <span class="n">quantity</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s2">&quot;quantity&quot;</span><span class="p">),</span>
+            <span class="n">revenue</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s2">&quot;line_total&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;-quantity&quot;</span><span class="p">)[:</span><span class="mi">10</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">top_items</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;catalog_item_id&quot;</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;catalog_item_id&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;catalog_item__name&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;quantity&quot;</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;quantity&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;revenue&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;revenue&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.00&quot;</span><span class="p">)),</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">top_items_raw</span>
+    <span class="p">]</span>
+
+    <span class="n">by_day_raw</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">non_cancelled_qs</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="n">day</span><span class="o">=</span><span class="n">TruncDate</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+            <span class="n">orders_count</span><span class="o">=</span><span class="n">Count</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">),</span>
+            <span class="n">revenue</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s2">&quot;total_price&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">by_day</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;date&quot;</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;day&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;day&quot;</span><span class="p">],</span> <span class="n">date</span><span class="p">)</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;day&quot;</span><span class="p">]),</span>
+            <span class="s2">&quot;orders_count&quot;</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;orders_count&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;revenue&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;revenue&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.00&quot;</span><span class="p">)),</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">by_day_raw</span>
+    <span class="p">]</span>
+
+    <span class="n">weekday_raw</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">non_cancelled_qs</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="n">dow</span><span class="o">=</span><span class="n">ExtractWeekDay</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">))</span>  <span class="c1"># 1..7</span>
+        <span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s2">&quot;dow&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+            <span class="n">orders_count</span><span class="o">=</span><span class="n">Count</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">),</span>
+            <span class="n">revenue</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s2">&quot;total_price&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;dow&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">weekday_labels</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;Вс&quot;</span><span class="p">,</span>
+        <span class="mi">2</span><span class="p">:</span> <span class="s2">&quot;Пн&quot;</span><span class="p">,</span>
+        <span class="mi">3</span><span class="p">:</span> <span class="s2">&quot;Вт&quot;</span><span class="p">,</span>
+        <span class="mi">4</span><span class="p">:</span> <span class="s2">&quot;Ср&quot;</span><span class="p">,</span>
+        <span class="mi">5</span><span class="p">:</span> <span class="s2">&quot;Чт&quot;</span><span class="p">,</span>
+        <span class="mi">6</span><span class="p">:</span> <span class="s2">&quot;Пт&quot;</span><span class="p">,</span>
+        <span class="mi">7</span><span class="p">:</span> <span class="s2">&quot;Сб&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">orders_by_weekday</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">weekday_raw</span><span class="p">:</span>
+        <span class="n">dow</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;dow&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="mi">0</span>
+        <span class="n">orders_by_weekday</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;weekday&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">dow</span><span class="p">),</span>
+                <span class="s2">&quot;weekday_display&quot;</span><span class="p">:</span> <span class="n">weekday_labels</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dow</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">dow</span><span class="p">)),</span>
+                <span class="s2">&quot;orders_count&quot;</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;orders_count&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;revenue&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;revenue&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.00&quot;</span><span class="p">)),</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="n">resp</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;period&quot;</span><span class="p">:</span> <span class="n">period</span><span class="p">,</span>
+        <span class="s2">&quot;from&quot;</span><span class="p">:</span> <span class="n">start</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span> <span class="k">if</span> <span class="n">start</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;to&quot;</span><span class="p">:</span> <span class="n">now</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+        <span class="s2">&quot;totals&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;orders_count&quot;</span><span class="p">:</span> <span class="n">total_orders</span><span class="p">,</span>
+            <span class="s2">&quot;delivered_count&quot;</span><span class="p">:</span> <span class="n">delivered_count</span><span class="p">,</span>
+            <span class="s2">&quot;cancelled_count&quot;</span><span class="p">:</span> <span class="n">cancelled_count</span><span class="p">,</span>
+            <span class="s2">&quot;revenue&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">revenue</span><span class="p">),</span>
+            <span class="s2">&quot;avg_check&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">avg_check</span><span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;status_counts&quot;</span><span class="p">:</span> <span class="n">status_counts</span><span class="p">,</span>
+        <span class="s2">&quot;top_items&quot;</span><span class="p">:</span> <span class="n">top_items</span><span class="p">,</span>
+        <span class="s2">&quot;by_day&quot;</span><span class="p">:</span> <span class="n">by_day</span><span class="p">,</span>
+        <span class="s2">&quot;orders_by_weekday&quot;</span><span class="p">:</span> <span class="n">orders_by_weekday</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">(</span><span class="n">resp</span><span class="p">,</span> <span class="n">json_dumps_params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ensure_ascii&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">BAZAAR</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Искать" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Навигация</h3>
+<p class="caption" role="heading"><span class="caption-text">Модули приложений</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Приложения проекта</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Код модуля</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Жагло И.Д., Запрягаев М.А., Коротков А.А., Красоткин А.А., Лясковский Т.М..
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

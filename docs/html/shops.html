@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+
+<html lang="ru" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>shops package &#8212; документация BAZAAR 1.0</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=9ca2116e"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/translations.js?v=cd1d70c9"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="users package" href="users.html" />
+    <link rel="prev" title="orders package" href="orders.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="shops-package">
+<h1>shops package<a class="headerlink" href="#shops-package" title="Ссылка на этот заголовок">¶</a></h1>
+<section id="module-shops.views">
+<span id="shops-views-module"></span><h2>shops.views module<a class="headerlink" href="#module-shops.views" title="Ссылка на этот заголовок">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.my_shops">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">my_shops</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#my_shops"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.my_shops" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Возвращает список магазинов, принадлежащих текущему пользователю.</p>
+<dl class="simple">
+<dt>Доступ:</dt><dd><ul class="simple">
+<li><p>Пользователь с ролью SHOP (владелец магазина).</p></li>
+<li><p>Администратор (видит все свои магазины, если создавал).</p></li>
+</ul>
+</dd>
+</dl>
+<p>HTTP метод: GET</p>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p>Список магазинов с полями id, name, address, description.</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+<dt class="field-even">Исключение<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>403</strong> – Пользователь не имеет роли SHOP или ADMIN.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_application_create">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_application_create</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_application_create"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_application_create" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Создаёт заявку на регистрацию нового магазина.</p>
+<p>Может вызываться как авторизованным пользователем, так и гостем.</p>
+<dl class="simple">
+<dt>Обязательные поля в JSON:</dt><dd><ul class="simple">
+<li><p>shop_name (str): Название магазина.</p></li>
+<li><p>address (str): Адрес магазина.</p></li>
+<li><p>contact_name (str): Контактное лицо.</p></li>
+<li><p>contact_phone (str): Телефон для связи.</p></li>
+</ul>
+</dd>
+<dt>Опциональные поля:</dt><dd><ul class="simple">
+<li><p>description (str): Описание магазина.</p></li>
+<li><p>comment (str): Дополнительный комментарий.</p></li>
+</ul>
+</dd>
+</dl>
+<p>HTTP метод: POST</p>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p>Данные созданной заявки (id, status, shop_name, contact_name, contact_phone) с HTTP 201.</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_catalog">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_catalog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shop_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_catalog"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_catalog" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Возвращает каталог товаров указанного магазина.</p>
+<p>Доступ: публичный (без авторизации).</p>
+<p>HTTP метод: GET</p>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p></li>
+<li><p><strong>shop_id</strong> (<em>int</em>) – Идентификатор магазина.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p>Объект с полями shop (id, name, address) и catalog (список товаров).</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+<dt class="field-even">Исключение<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>404</strong> – Магазин не найден.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_catalog_item_manage">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_catalog_item_manage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shop_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">item_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_catalog_item_manage"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_catalog_item_manage" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Управление конкретным товаром каталога: обновление (PATCH) или удаление (DELETE).</p>
+<dl class="simple">
+<dt>Доступ:</dt><dd><ul class="simple">
+<li><p>Владелец магазина (роль SHOP).</p></li>
+<li><p>Администратор.</p></li>
+</ul>
+</dd>
+<dt>HTTP методы:</dt><dd><ul class="simple">
+<li><p>PATCH: обновление полей товара (name, description, price, is_available, section_id).</p></li>
+<li><p>DELETE: удаление товара.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p></li>
+<li><p><strong>shop_id</strong> (<em>int</em>) – ID магазина.</p></li>
+<li><p><strong>item_id</strong> (<em>int</em>) – ID товара.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>При PATCH – обновлённые данные товара.</dt><dd><p>При DELETE – {«detail»: «Deleted»}.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+<dt class="field-even">Исключение<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>403</strong> – Недостаточно прав.</p></li>
+<li><p><strong>404</strong> – Магазин или товар не найден.</p></li>
+<li><p><strong>400</strong> – Некорректные данные (неверный JSON или цена).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_catalog_manage">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_catalog_manage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shop_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_catalog_manage"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_catalog_manage" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Управление каталогом магазина: создание нового товара.</p>
+<dl class="simple">
+<dt>Доступ:</dt><dd><ul class="simple">
+<li><p>Владелец магазина (роль SHOP).</p></li>
+<li><p>Администратор.</p></li>
+</ul>
+</dd>
+</dl>
+<p>HTTP метод: POST</p>
+<dl class="simple">
+<dt>Тело запроса (JSON):</dt><dd><ul class="simple">
+<li><p>name (str, обязательное): Название товара.</p></li>
+<li><p>price (decimal, обязательное): Цена.</p></li>
+<li><p>description (str, опционально): Описание.</p></li>
+<li><p>is_available (bool, опционально, по умолчанию True): Доступность.</p></li>
+<li><p>section_id (int, опционально): ID раздела каталога.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p></li>
+<li><p><strong>shop_id</strong> (<em>int</em>) – ID магазина.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p>Данные созданного товара (id, section_id, name, description, price, is_available) с HTTP 201.</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+<dt class="field-even">Исключение<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>403</strong> – Недостаточно прав или магазин не принадлежит пользователю.</p></li>
+<li><p><strong>404</strong> – Магазин или раздел не найден.</p></li>
+<li><p><strong>400</strong> – Некорректные данные (отсутствуют обязательные поля, неверная цена).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_list">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_list"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_list" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Возвращает список всех магазинов, зарегистрированных на платформе.</p>
+<p>Доступ: публичный (без авторизации).</p>
+<p>HTTP метод: GET</p>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p>Список магазинов с полями id, name, address, description.</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_section_item_manage">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_section_item_manage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shop_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_section_item_manage"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_section_item_manage" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Управление конкретным разделом каталога: обновление (PATCH) или удаление (DELETE).</p>
+<dl class="simple">
+<dt>Доступ:</dt><dd><ul class="simple">
+<li><p>Владелец магазина (роль SHOP).</p></li>
+<li><p>Администратор.</p></li>
+</ul>
+</dd>
+<dt>HTTP методы:</dt><dd><ul class="simple">
+<li><p>PATCH: обновление полей раздела (name, ordering).</p></li>
+<li><p>DELETE: удаление раздела. Товары, привязанные к разделу, получают section = NULL (не удаляются).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p></li>
+<li><p><strong>shop_id</strong> (<em>int</em>) – ID магазина.</p></li>
+<li><p><strong>section_id</strong> (<em>int</em>) – ID раздела.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>При PATCH – обновлённые данные раздела.</dt><dd><p>При DELETE – {«detail»: «Deleted»}.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+<dt class="field-even">Исключение<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>403</strong> – Недостаточно прав.</p></li>
+<li><p><strong>404</strong> – Магазин или раздел не найден.</p></li>
+<li><p><strong>400</strong> – Некорректные данные (неверный JSON).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_sections_manage">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_sections_manage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shop_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_sections_manage"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_sections_manage" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Управление разделами каталога магазина.</p>
+<dl class="simple">
+<dt>Доступ:</dt><dd><ul class="simple">
+<li><p>Владелец магазина (роль SHOP).</p></li>
+<li><p>Администратор.</p></li>
+</ul>
+</dd>
+<dt>HTTP методы:</dt><dd><ul class="simple">
+<li><p>GET: список разделов магазина.</p></li>
+<li><p>POST: создание нового раздела.</p></li>
+</ul>
+</dd>
+<dt>При POST:</dt><dd><p>Обязательное поле: name (str).
+Опциональное поле: ordering (int, по умолчанию 0).</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p></li>
+<li><p><strong>shop_id</strong> (<em>int</em>) – ID магазина.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>При GET – список разделов (id, name, ordering).</dt><dd><p>При POST – данные созданного раздела с HTTP 201.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+<dt class="field-even">Исключение<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>403</strong> – Недостаточно прав.</p></li>
+<li><p><strong>404</strong> – Магазин не найден.</p></li>
+<li><p><strong>400</strong> – Некорректные данные (отсутствует name).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="shops.views.shop_stats">
+<span class="sig-prename descclassname"><span class="pre">shops.views.</span></span><span class="sig-name descname"><span class="pre">shop_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shop_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/views.html#shop_stats"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.views.shop_stats" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Возвращает расширенную статистику по заказам магазина.</p>
+<dl class="simple">
+<dt>Доступ:</dt><dd><ul class="simple">
+<li><p>Владелец магазина (роль SHOP).</p></li>
+<li><p>Администратор.</p></li>
+</ul>
+</dd>
+<dt>Параметры запроса (GET):</dt><dd><ul class="simple">
+<li><p>period (str, опционально): today | 7d | 30d | all. По умолчанию 7d.</p></li>
+</ul>
+</dd>
+<dt>Возвращаемые данные:</dt><dd><ul class="simple">
+<li><p>period, from, to – период статистики.</p></li>
+<li><p>totals: общее число заказов, доставленных, отменённых, выручка, средний чек.</p></li>
+<li><p>status_counts: количество заказов по каждому статусу.</p></li>
+<li><p>top_items: топ-10 товаров по количеству продаж и выручке.</p></li>
+<li><p>by_day: динамика заказов и выручки по дням.</p></li>
+<li><p>orders_by_weekday: распределение по дням недели.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>request</strong> (<em>HttpRequest</em>) – Объект запроса.</p></li>
+<li><p><strong>shop_id</strong> (<em>int</em>) – ID магазина.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Результат<span class="colon">:</span></dt>
+<dd class="field-even"><p>Объект со статистикой.</p>
+</dd>
+<dt class="field-odd">Тип результата<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JsonResponse</p>
+</dd>
+<dt class="field-even">Исключение<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>403</strong> – Недостаточно прав.</p></li>
+<li><p><strong>404</strong> – Магазин не найден.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-shops.models">
+<span id="shops-models-module"></span><h2>shops.models module<a class="headerlink" href="#module-shops.models" title="Ссылка на этот заголовок">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="shops.models.CatalogItem">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">shops.models.</span></span><span class="sig-name descname"><span class="pre">CatalogItem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/models.html#CatalogItem"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.models.CatalogItem" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<p>Товар в каталоге магазина.</p>
+<p>Принадлежит конкретному магазину и опционально – разделу каталога.
+Содержит цену, описание и флаг доступности.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.shop">
+<span class="sig-name descname"><span class="pre">shop</span></span><a class="headerlink" href="#shops.models.CatalogItem.shop" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Магазин, в котором продаётся товар.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ForeignKey</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.section">
+<span class="sig-name descname"><span class="pre">section</span></span><a class="headerlink" href="#shops.models.CatalogItem.section" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Раздел каталога (может быть NULL, если раздел не указан).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ForeignKey</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#shops.models.CatalogItem.name" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Название товара.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.description">
+<span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#shops.models.CatalogItem.description" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Описание товара.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>TextField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.price">
+<span class="sig-name descname"><span class="pre">price</span></span><a class="headerlink" href="#shops.models.CatalogItem.price" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Цена товара.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>DecimalField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.is_available">
+<span class="sig-name descname"><span class="pre">is_available</span></span><a class="headerlink" href="#shops.models.CatalogItem.is_available" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Доступен ли товар для заказа (по умолчанию True).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>BooleanField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.DoesNotExist">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#shops.models.CatalogItem.DoesNotExist" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.MultipleObjectsReturned">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#shops.models.CatalogItem.MultipleObjectsReturned" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.NotUpdated">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">NotUpdated</span></span><a class="headerlink" href="#shops.models.CatalogItem.NotUpdated" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectNotUpdated</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">DatabaseError</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#shops.models.CatalogItem.objects" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.orderitem_set">
+<span class="sig-name descname"><span class="pre">orderitem_set</span></span><a class="headerlink" href="#shops.models.CatalogItem.orderitem_set" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_reverse_many_to_one_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-name descname"><span class="pre">section</span></span><a class="headerlink" href="#id0" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.section_id">
+<span class="sig-name descname"><span class="pre">section_id</span></span><a class="headerlink" href="#shops.models.CatalogItem.section_id" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-name descname"><span class="pre">shop</span></span><a class="headerlink" href="#id1" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogItem.shop_id">
+<span class="sig-name descname"><span class="pre">shop_id</span></span><a class="headerlink" href="#shops.models.CatalogItem.shop_id" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="shops.models.CatalogSection">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">shops.models.</span></span><span class="sig-name descname"><span class="pre">CatalogSection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/models.html#CatalogSection"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.models.CatalogSection" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<p>Раздел каталога товаров внутри магазина.</p>
+<p>Позволяет группировать товары по категориям (например, «Овощи», «Молочные продукты»).
+Порядок отображения разделов задаётся полем ordering.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.shop">
+<span class="sig-name descname"><span class="pre">shop</span></span><a class="headerlink" href="#shops.models.CatalogSection.shop" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Магазин, которому принадлежит раздел.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ForeignKey</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#shops.models.CatalogSection.name" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Название раздела.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.ordering">
+<span class="sig-name descname"><span class="pre">ordering</span></span><a class="headerlink" href="#shops.models.CatalogSection.ordering" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Порядок сортировки при отображении (по возрастанию).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>PositiveIntegerField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.DoesNotExist">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#shops.models.CatalogSection.DoesNotExist" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.MultipleObjectsReturned">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#shops.models.CatalogSection.MultipleObjectsReturned" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.NotUpdated">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">NotUpdated</span></span><a class="headerlink" href="#shops.models.CatalogSection.NotUpdated" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectNotUpdated</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">DatabaseError</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.items">
+<span class="sig-name descname"><span class="pre">items</span></span><a class="headerlink" href="#shops.models.CatalogSection.items" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_reverse_many_to_one_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#shops.models.CatalogSection.objects" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">shop</span></span><a class="headerlink" href="#id2" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.CatalogSection.shop_id">
+<span class="sig-name descname"><span class="pre">shop_id</span></span><a class="headerlink" href="#shops.models.CatalogSection.shop_id" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="shops.models.Shop">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">shops.models.</span></span><span class="sig-name descname"><span class="pre">Shop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/models.html#Shop"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.models.Shop" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<p>Модель магазина (партнёра), зарегистрированного на платформе.</p>
+<p>Каждый магазин принадлежит одному пользователю-владельцу (роль SHOP).
+Содержит основную информацию: название, адрес, описание.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.owner">
+<span class="sig-name descname"><span class="pre">owner</span></span><a class="headerlink" href="#shops.models.Shop.owner" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Владелец магазина (пользователь с ролью SHOP).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ForeignKey</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#shops.models.Shop.name" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Название магазина.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.address">
+<span class="sig-name descname"><span class="pre">address</span></span><a class="headerlink" href="#shops.models.Shop.address" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Физический адрес магазина.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.description">
+<span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#shops.models.Shop.description" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Описание магазина (ассортимент, время работы и т.д.).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>TextField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.Shop.DoesNotExist">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#shops.models.Shop.DoesNotExist" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.Shop.MultipleObjectsReturned">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#shops.models.Shop.MultipleObjectsReturned" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.Shop.NotUpdated">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">NotUpdated</span></span><a class="headerlink" href="#shops.models.Shop.NotUpdated" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectNotUpdated</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">DatabaseError</span></code></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.catalog_items">
+<span class="sig-name descname"><span class="pre">catalog_items</span></span><a class="headerlink" href="#shops.models.Shop.catalog_items" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_reverse_many_to_one_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.catalog_sections">
+<span class="sig-name descname"><span class="pre">catalog_sections</span></span><a class="headerlink" href="#shops.models.Shop.catalog_sections" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_reverse_many_to_one_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#shops.models.Shop.objects" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.orders">
+<span class="sig-name descname"><span class="pre">orders</span></span><a class="headerlink" href="#shops.models.Shop.orders" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related objects manager on the reverse side of a
+many-to-one relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Parent.children</span></code> is a <code class="docutils literal notranslate"><span class="pre">ReverseManyToOneDescriptor</span></code> instance.</p>
+<p>Most of the implementation is delegated to a dynamically defined manager
+class built by <code class="docutils literal notranslate"><span class="pre">create_reverse_many_to_one_manager()</span></code> defined below.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">owner</span></span><a class="headerlink" href="#id3" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.Shop.owner_id">
+<span class="sig-name descname"><span class="pre">owner_id</span></span><a class="headerlink" href="#shops.models.Shop.owner_id" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="shops.models.ShopApplication">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">shops.models.</span></span><span class="sig-name descname"><span class="pre">ShopApplication</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/models.html#ShopApplication"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.models.ShopApplication" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Model</span></code></p>
+<p>Заявка от пользователя на регистрацию нового магазина на платформе.</p>
+<p>Подаётся пользователем (авторизованным или гостем? здесь user может быть null).
+Содержит контактные данные и информацию о магазине.
+Администратор платформы обрабатывает заявку, меняя статус.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.user">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#shops.models.ShopApplication.user" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Пользователь, подавший заявку (может быть NULL для гостя).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ForeignKey</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.shop_name">
+<span class="sig-name descname"><span class="pre">shop_name</span></span><a class="headerlink" href="#shops.models.ShopApplication.shop_name" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Желаемое название магазина.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.address">
+<span class="sig-name descname"><span class="pre">address</span></span><a class="headerlink" href="#shops.models.ShopApplication.address" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Адрес магазина.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.description">
+<span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#shops.models.ShopApplication.description" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Описание магазина.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>TextField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.contact_name">
+<span class="sig-name descname"><span class="pre">contact_name</span></span><a class="headerlink" href="#shops.models.ShopApplication.contact_name" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Контактное лицо (ФИО).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.contact_phone">
+<span class="sig-name descname"><span class="pre">contact_phone</span></span><a class="headerlink" href="#shops.models.ShopApplication.contact_phone" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Телефон для связи.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.comment">
+<span class="sig-name descname"><span class="pre">comment</span></span><a class="headerlink" href="#shops.models.ShopApplication.comment" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Дополнительная информация от заявителя.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>TextField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.status">
+<span class="sig-name descname"><span class="pre">status</span></span><a class="headerlink" href="#shops.models.ShopApplication.status" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Статус рассмотрения (PENDING, APPROVED, REJECTED).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CharField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.created_at">
+<span class="sig-name descname"><span class="pre">created_at</span></span><a class="headerlink" href="#shops.models.ShopApplication.created_at" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Дата и время создания заявки.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>DateTimeField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.processed_at">
+<span class="sig-name descname"><span class="pre">processed_at</span></span><a class="headerlink" href="#shops.models.ShopApplication.processed_at" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Дата и время обработки заявки (если обработана).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>DateTimeField</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.DoesNotExist">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">DoesNotExist</span></span><a class="headerlink" href="#shops.models.ShopApplication.DoesNotExist" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectDoesNotExist</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.MultipleObjectsReturned">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MultipleObjectsReturned</span></span><a class="headerlink" href="#shops.models.ShopApplication.MultipleObjectsReturned" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">MultipleObjectsReturned</span></code></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.NotUpdated">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">NotUpdated</span></span><a class="headerlink" href="#shops.models.ShopApplication.NotUpdated" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ObjectNotUpdated</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">DatabaseError</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.Status">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/shops/models.html#ShopApplication.Status"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#shops.models.ShopApplication.Status" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">TextChoices</span></code></p>
+<p>Статусы обработки заявки на регистрацию магазина.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.Status.APPROVED">
+<span class="sig-name descname"><span class="pre">APPROVED</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'APPROVED'</span></span><a class="headerlink" href="#shops.models.ShopApplication.Status.APPROVED" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.Status.PENDING">
+<span class="sig-name descname"><span class="pre">PENDING</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'PENDING'</span></span><a class="headerlink" href="#shops.models.ShopApplication.Status.PENDING" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.Status.REJECTED">
+<span class="sig-name descname"><span class="pre">REJECTED</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'REJECTED'</span></span><a class="headerlink" href="#shops.models.ShopApplication.Status.REJECTED" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.get_next_by_created_at">
+<span class="sig-name descname"><span class="pre">get_next_by_created_at</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">created_at&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#shops.models.ShopApplication.get_next_by_created_at" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.get_previous_by_created_at">
+<span class="sig-name descname"><span class="pre">get_previous_by_created_at</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;django.db.models.fields.DateTimeField:</span> <span class="pre">created_at&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_next</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#shops.models.ShopApplication.get_previous_by_created_at" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.get_status_display">
+<span class="sig-name descname"><span class="pre">get_status_display</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;django.db.models.fields.CharField:</span> <span class="pre">status&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#shops.models.ShopApplication.get_status_display" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;django.db.models.manager.Manager</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#shops.models.ShopApplication.objects" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="id4">
+<span class="sig-name descname"><span class="pre">user</span></span><a class="headerlink" href="#id4" title="Ссылка на это определение">¶</a></dt>
+<dd><p>Accessor to the related object on the forward side of a many-to-one or
+one-to-one (via ForwardOneToOneDescriptor subclass) relation.</p>
+<p>In the example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Parent</span><span class="p">,</span> <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;children&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Child.parent</span></code> is a <code class="docutils literal notranslate"><span class="pre">ForwardManyToOneDescriptor</span></code> instance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="shops.models.ShopApplication.user_id">
+<span class="sig-name descname"><span class="pre">user_id</span></span><a class="headerlink" href="#shops.models.ShopApplication.user_id" title="Ссылка на это определение">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">BAZAAR</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Искать" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Навигация</h3>
+<p class="caption" role="heading"><span class="caption-text">Модули приложений</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">Приложения проекта</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="delivery.html">delivery package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="orders.html">orders package</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">shops package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="users.html">users package</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  <li><a href="modules.html">Приложения проекта</a><ul>
+      <li>Previous: <a href="orders.html" title="предыдущая глава">orders package</a></li>
+      <li>Next: <a href="users.html" title="следующая глава">users package</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Жагло И.Д., Запрягаев М.А., Коротков А.А., Красоткин А.А., Лясковский Т.М..
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/shops.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

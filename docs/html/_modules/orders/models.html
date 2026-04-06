@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+
+<html lang="ru" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>orders.models &#8212; документация BAZAAR 1.0</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=9ca2116e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/translations.js?v=cd1d70c9"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Исходный код orders.models</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">django.conf</span><span class="w"> </span><span class="kn">import</span> <span class="n">settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shops.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Shop</span><span class="p">,</span> <span class="n">CatalogItem</span>
+
+<div class="viewcode-block" id="Order">
+<a class="viewcode-back" href="../../orders.html#orders.models.Order">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Order</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Модель заказа клиента.</span>
+
+<span class="sd">    Представляет собой заказ, сделанный клиентом в определённом магазине.</span>
+<span class="sd">    Содержит информацию о клиенте, магазине, статусе заказа, общей стоимости,</span>
+<span class="sd">    адресе доставки и времени создания.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        client (ForeignKey): Ссылка на пользователя-клиента (AUTH_USER_MODEL).</span>
+<span class="sd">        shop (ForeignKey): Ссылка на магазин (модель Shop).</span>
+<span class="sd">        status (CharField): Текущий статус заказа (NEW, ASSEMBLING, READY, ON_DELIVERY, DELIVERED, CANCELLED).</span>
+<span class="sd">        created_at (DateTimeField): Дата и время создания заказа (автоматически).</span>
+<span class="sd">        total_price (DecimalField): Общая стоимость заказа (сумма позиций).</span>
+<span class="sd">        delivery_address (CharField): Адрес доставки (улица, дом, квартира и т.д.).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Order.Status">
+<a class="viewcode-back" href="../../orders.html#orders.models.Order.Status">[документация]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">Status</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">TextChoices</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Допустимые статусы заказа.&quot;&quot;&quot;</span>
+        <span class="n">NEW</span> <span class="o">=</span> <span class="s1">&#39;NEW&#39;</span><span class="p">,</span> <span class="s1">&#39;New&#39;</span>
+        <span class="n">COOKING</span> <span class="o">=</span> <span class="s1">&#39;ASSEMBLING&#39;</span><span class="p">,</span> <span class="s1">&#39;Assembling&#39;</span>
+        <span class="n">READY</span> <span class="o">=</span> <span class="s1">&#39;READY&#39;</span><span class="p">,</span> <span class="s1">&#39;Ready&#39;</span>
+        <span class="n">ON_DELIVERY</span> <span class="o">=</span> <span class="s1">&#39;ON_DELIVERY&#39;</span><span class="p">,</span> <span class="s1">&#39;On delivery&#39;</span>
+        <span class="n">DELIVERED</span> <span class="o">=</span> <span class="s1">&#39;DELIVERED&#39;</span><span class="p">,</span> <span class="s1">&#39;Delivered&#39;</span>
+        <span class="n">CANCELLED</span> <span class="o">=</span> <span class="s1">&#39;CANCELLED&#39;</span><span class="p">,</span> <span class="s1">&#39;Cancelled&#39;</span></div>
+
+
+    <span class="n">client</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">AUTH_USER_MODEL</span><span class="p">,</span>
+        <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">,</span>
+        <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;orders&#39;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">shop</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span>
+        <span class="n">Shop</span><span class="p">,</span>
+        <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">,</span>
+        <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;orders&#39;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span>
+        <span class="n">max_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">Status</span><span class="o">.</span><span class="n">choices</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">Status</span><span class="o">.</span><span class="n">NEW</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">created_at</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">DateTimeField</span><span class="p">(</span><span class="n">auto_now_add</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">total_price</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">DecimalField</span><span class="p">(</span>
+        <span class="n">max_digits</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">decimal_places</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">delivery_address</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">255</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Возвращает строковое представление заказа.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Строка вида &#39;Order #&lt;id&gt; (&lt;status&gt;)&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Order #</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="s2">)&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="OrderItem">
+<a class="viewcode-back" href="../../orders.html#orders.models.OrderItem">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">OrderItem</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Позиция заказа (строка заказа).</span>
+
+<span class="sd">    Соответствует одному товару (CatalogItem) в составе конкретного заказа.</span>
+<span class="sd">    Хранит количество единиц товара и цену на момент заказа (для защиты от изменений цены в каталоге).</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        order (ForeignKey): Заказ, к которому относится позиция.</span>
+<span class="sd">        catalog_item (ForeignKey): Товар из каталога магазина.</span>
+<span class="sd">        quantity (PositiveIntegerField): Количество единиц товара.</span>
+<span class="sd">        price_at_moment (DecimalField): Цена товара на момент оформления заказа.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">order</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span>
+        <span class="n">Order</span><span class="p">,</span>
+        <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">,</span>
+        <span class="n">related_name</span><span class="o">=</span><span class="s1">&#39;items&#39;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">catalog_item</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">CatalogItem</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">PROTECT</span><span class="p">)</span>
+    <span class="n">quantity</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">PositiveIntegerField</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">price_at_moment</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">DecimalField</span><span class="p">(</span><span class="n">max_digits</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">decimal_places</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Возвращает строковое представление позиции заказа.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Строка вида &#39;&lt;название товара&gt; x &lt;количество&gt;&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">catalog_item</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> x </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">quantity</span><span class="si">}</span><span class="s1">&#39;</span>
+
+<div class="viewcode-block" id="OrderItem.get_total">
+<a class="viewcode-back" href="../../orders.html#orders.models.OrderItem.get_total">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_total</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Вычисляет общую стоимость данной позиции заказа.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Decimal: Стоимость = price_at_moment * quantity.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">price_at_moment</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">quantity</span></div>
+</div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">BAZAAR</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Искать" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Навигация</h3>
+<p class="caption" role="heading"><span class="caption-text">Модули приложений</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Приложения проекта</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Код модуля</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Жагло И.Д., Запрягаев М.А., Коротков А.А., Красоткин А.А., Лясковский Т.М..
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

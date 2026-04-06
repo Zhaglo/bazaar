@@ -1,0 +1,20 @@
+shops package
+=============
+
+shops.views module
+------------------
+
+.. automodule:: shops.views
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-special-members:
+
+shops.models module
+-------------------
+
+.. automodule:: shops.models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-special-members:

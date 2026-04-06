@@ -1,0 +1,21 @@
+orders package
+==============
+
+orders.views module
+-------------------
+
+.. automodule:: orders.views
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-special-members:
+
+
+orders.models module
+--------------------
+
+.. automodule:: orders.models
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-special-members:
