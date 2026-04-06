@@ -11,6 +11,15 @@ from orders.models import Order
 
 
 def _parse_json(request):
+    """
+    Извлекает и декодирует JSON из тела HTTP-запроса.
+
+    Args:
+        request (HttpRequest): Объект HTTP-запроса Django.
+
+    Returns:
+        dict | None: Словарь, полученный из JSON, или None, если JSON некорректен.
+    """
     try:
         return json.loads(request.body.decode('utf-8'))
     except json.JSONDecodeError:
@@ -19,7 +28,25 @@ def _parse_json(request):
 
 def delivery_task_list(request):
     """
-    Список задач доставки для текущего курьера (или админа).
+    Возвращает список задач доставки для текущего пользователя.
+
+    Доступ:
+        - Курьер: видит только свои задачи.
+        - Администратор: видит все задачи.
+        - Другие роли (клиент, партнёр) получают 403.
+
+    HTTP метод: GET
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        JsonResponse: Список задач с деталями заказа (клиент, магазин, адрес, сумма).
+
+    Raises:
+        401: Пользователь не аутентифицирован.
+        403: Роль не разрешена (не курьер и не админ).
+        404: Профиль курьера не найден (для роли курьера).
     """
     if request.method != 'GET':
         return JsonResponse({'detail': 'Method not allowed'}, status=405)
@@ -50,7 +77,6 @@ def delivery_task_list(request):
         order = task.order
         client = order.client
 
-        # если в User нет phone — либо убери это поле, либо замени на своё
         client_phone = getattr(client, "phone", "")
         client_name = getattr(client, 'display_name', '') or client.username
 
@@ -76,9 +102,28 @@ def delivery_task_list(request):
 
 def delivery_offers_list(request):
     """
-    Список свободных задач (офферы) для курьеров:
-    - статус PENDING
-    - courier IS NULL
+    Возвращает список свободных (доступных) задач доставки для курьеров.
+
+    Условия отбора:
+        - Статус задачи = PENDING.
+        - Поле courier = NULL (задача не назначена).
+
+    Доступ:
+        - Курьер: требуется активный профиль.
+        - Администратор: может просматривать офферы.
+
+    HTTP метод: GET
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        JsonResponse: Список свободных задач с информацией о заказе.
+
+    Raises:
+        401: Пользователь не аутентифицирован.
+        403: Неверная роль или профиль курьера не активен.
+        404: Профиль курьера не найден.
     """
     if request.method != "GET":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
@@ -90,7 +135,6 @@ def delivery_offers_list(request):
     if user.role not in (User.Roles.COURIER, User.Roles.ADMIN):
         return JsonResponse({"detail": "Forbidden"}, status=403)
 
-    # курьер должен иметь профиль и быть активным
     if user.role == User.Roles.COURIER:
         try:
             courier_profile = CourierProfile.objects.get(user=user)
@@ -134,13 +178,28 @@ def delivery_offers_list(request):
 @csrf_exempt
 def delivery_task_assign(request, task_id: int):
     """
-    Курьер берёт свободную задачу доставки (оффер) себе.
+    Назначает задачу доставки текущему курьеру (или админу).
 
-    Правила:
-    - только роль COURIER (или ADMIN для тестов)
-    - курьер должен быть активен
-    - у курьера не должно быть другой активной задачи (ASSIGNED/IN_PROGRESS)
-    - задача должна быть в статусе PENDING и без курьера
+    Правила назначения:
+        - Задача должна быть в статусе PENDING и не иметь курьера.
+        - Курьер должен иметь активный профиль.
+        - У курьера не должно быть других активных задач (ASSIGNED/IN_PROGRESS).
+        - Используется блокировка SELECT FOR UPDATE для защиты от гонок.
+
+    HTTP метод: POST
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        task_id (int): Идентификатор задачи доставки.
+
+    Returns:
+        JsonResponse: Обновлённые данные задачи (id, статус, заказ, курьер).
+
+    Raises:
+        401: Пользователь не аутентифицирован.
+        403: Недостаточно прав или курьер не активен.
+        404: Задача не найдена.
+        400: Задача уже занята, не в PENDING, или у курьера есть активная задача.
     """
     if request.method != "POST":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
@@ -165,7 +224,6 @@ def delivery_task_assign(request, task_id: int):
                 status=403,
             )
 
-        # проверка: нет ли уже активной задачи
         has_active = DeliveryTask.objects.filter(
             courier=courier_profile,
             status__in=[
@@ -182,7 +240,6 @@ def delivery_task_assign(request, task_id: int):
                 status=400,
             )
 
-    # защищаемся от гонки: два курьера одновременно жмут "Взять"
     with transaction.atomic():
         try:
             task = (
@@ -223,6 +280,32 @@ def delivery_task_assign(request, task_id: int):
 
 @csrf_exempt
 def delivery_task_change_status(request, task_id: int):
+    """
+    Изменяет статус задачи доставки.
+
+    Доступ:
+        - Курьер: только для своих задач.
+        - Администратор: для любых задач.
+
+    При изменении статуса синхронизируется статус связанного заказа:
+        - IN_PROGRESS → Order.Status.ON_DELIVERY
+        - DONE → Order.Status.DELIVERED
+
+    HTTP метод: PATCH
+
+    Args:
+        request (HttpRequest): Объект запроса. Тело должно содержать JSON с ключом 'status'.
+        task_id (int): Идентификатор задачи доставки.
+
+    Returns:
+        JsonResponse: Новый статус задачи.
+
+    Raises:
+        401: Пользователь не аутентифицирован.
+        403: Недостаточно прав (не свой заказ и не админ).
+        404: Задача не найдена.
+        400: Неверный JSON или недопустимое значение статуса.
+    """
     if request.method != 'PATCH':
         return JsonResponse({'detail': 'Method not allowed'}, status=405)
 
@@ -255,7 +338,6 @@ def delivery_task_change_status(request, task_id: int):
     task.status = new_status
     task.save()
 
-    # синхронизируем статус заказа
     if new_status == DeliveryTask.Status.IN_PROGRESS:
         order = task.order
         order.status = Order.Status.ON_DELIVERY
@@ -277,8 +359,31 @@ def delivery_task_change_status(request, task_id: int):
 @csrf_exempt
 def courier_application_create(request):
     """
-    Оставить заявку на регистрацию курьером.
-    Может вызываться как залогиненным пользователем, так и гостем.
+    Создаёт заявку на регистрацию курьером.
+
+    Доступ:
+        - Анонимные пользователи (гости) могут оставить заявку.
+        - Аутентифицированные пользователи также могут (связь с профилем).
+
+    Обязательные поля в JSON:
+        - full_name (str): ФИО заявителя.
+        - phone (str): Контактный телефон.
+
+    Опциональные поля:
+        - vehicle_type (str): Тип транспорта.
+        - comment (str): Комментарий.
+
+    HTTP метод: POST
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        JsonResponse: Данные созданной заявки (id, статус, full_name, phone) с HTTP 201.
+
+    Raises:
+        405: Неверный HTTP метод.
+        400: Отсутствует JSON или не заполнены обязательные поля (full_name, phone).
     """
     if request.method != "POST":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
